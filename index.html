@@ -805,9 +805,7 @@ async function exportPDF(){
   // =============  PAGE 2+: SUMMARY & PHOTOS ============
   // =====================================================
   // Create next page with your existing styled header/footer
-  header('Laporan Kerja Longkang', 'Rompin • 500 ekar • Local only');
-  footer();
-  let y = 72; // content start below header
+  let y = newPage('Laporan Kerja Longkang', 'Rompin • 500 ekar • Local only');
 
   // QUICK INFO chips
   const chips = [
