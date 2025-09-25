@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rompin Longkang Work Log (500 Ekar)</title>
+
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- jsPDF + html2canvas for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <style>
+    /* Subtle brand accent */
+    :root{ --brand:#4f46e5; }
+    .accent { color: var(--brand); }
+    .accent-bg { background: var(--brand); }
+    .section-card{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; box-shadow:0 10px 20px rgba(0,0,0,0.04); }
+    .label{ @apply text-sm text-gray-600; }
+    .hint { @apply text-xs text-gray-500; }
+    .badge{ @apply inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700; }
+    .btn{ @apply rounded-xl px-4 py-2 font-medium; }
+    .btn-primary{ background:var(--brand); color:#fff; }
+    .btn-primary:hover{ filter:brightness(0.95); }
+    .btn-ghost{ @apply bg-gray-100 text-gray-800; }
+    .btn-danger{ @apply bg-red-600 text-white; }
+    .grid-photos{ display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
+    .photo-card{ @apply rounded-lg border border-gray-200 overflow-hidden bg-white; }
+    .photo-card img{ width:100%; height:140px; object-fit:cover; display:block; }
+    .photo-cap{ @apply text-xs text-gray-600 p-2; }
+    canvas.sig{ width:100%; height:160px; border:1px dashed #cbd5e1; border-radius:0.75rem; background:#fafafa; touch-action: none; }
+    /* Review area for PDF snapshot has white background */
+    #reviewArea{ background:#fff; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl accent-bg"></div>
+        <div>
+          <h1 class="font-semibold">Rompin Longkang Work Log</h1>
+          <p class="text-xs text-gray-500">Korek longkang • 500 ekar • Local only</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btnFormTab" class="btn btn-ghost">Form</button>
+        <button id="btnReviewTab" class="btn btn-ghost">Review</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <!-- FORM -->
+    <section id="formSection" class="space-y-6">
+      <!-- Project / Meta -->
+      <div class="section-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Maklumat Kerja</h2>
+          <span class="badge">Rompin • 500 Ekar</span>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4">
+          <div>
+            <label class="label">Tarikh</label>
+            <input id="date" type="date" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div>
+            <label class="label">Masa Mula</label>
+            <input id="startTime" type="time" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div>
+            <label class="label">Masa Tamat</label>
+            <input id="endTime" type="time" class="w-full rounded-xl border-gray-300" />
+          </div>
+
+          <div>
+            <label class="label">Nama Pekerja</label>
+            <input id="workerName" type="text" placeholder="cth: Azmi Bin Ali" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div>
+            <label class="label">Nama Penyelia</label>
+            <input id="supervisor" type="text" placeholder="cth: Encik Rahman" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div>
+            <label class="label">Pasukan / Syif</label>
+            <input id="team" type="text" placeholder="cth: Team A / Pagi" class="w-full rounded-xl border-gray-300" />
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="label">Lokasi / Seksyen</label>
+            <input id="location" type="text" placeholder="cth: Blok C, Lorong 4" class="w-full rounded-xl border-gray-300" />
+            <p class="hint">Boleh guna penanda seperti “Blok”, “Lorong”, “Petak”, dsb.</p>
+          </div>
+          <div>
+            <label class="label">GPS</label>
+            <div class="flex gap-2">
+              <input id="gps" type="text" placeholder="Lat, Lon" class="w-full rounded-xl border-gray-300" />
+              <button id="btnGPS" class="btn btn-ghost">Auto</button>
+            </div>
+            <p class="hint">Klik Auto untuk ambil lokasi semasa (jika dibenarkan).</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Work Details -->
+      <div class="section-card p-5">
+        <h2 class="text-lg font-semibold mb-4">Butiran Kerja Longkang</h2>
+        <div class="grid md:grid-cols-3 gap-4">
+          <div>
+            <label class="label">Panjang Dikorek (m)</label>
+            <input id="len" type="number" step="0.1" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div>
+            <label class="label">Lebar (m)</label>
+            <input id="wid" type="number" step="0.1" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div>
+            <label class="label">Dalam (m)</label>
+            <input id="dep" type="number" step="0.1" class="w-full rounded-xl border-gray-300" />
+          </div>
+
+          <div>
+            <label class="label">Keadaan Tanah</label>
+            <select id="soil" class="w-full rounded-xl border-gray-300">
+              <option value="">Pilih</option>
+              <option>Liat</option><option>Berpasir</option><option>Lumpur</option><option>Campuran</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">Cuaca</label>
+            <select id="weather" class="w-full rounded-xl border-gray-300">
+              <option value="">Pilih</option>
+              <option>Cerah</option><option>Mendung</option><option>Hujan Renyai</option><option>Hujan Lebat</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">Aliran Air</label>
+            <select id="flow" class="w-full rounded-xl border-gray-300">
+              <option value="">Pilih</option>
+              <option>Tiada</option><option>Perlahan</option><option>Sederhana</option><option>Laju</option>
+            </select>
+          </div>
+
+          <div class="md:col-span-3">
+            <label class="label">Peralatan Digunakan</label>
+            <input id="tools" type="text" placeholder="cth: Backhoe, cangkul, lori" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div class="md:col-span-3">
+            <label class="label">Bahan / Kerja Tambahan</label>
+            <input id="materials" type="text" placeholder="cth: Batu, paip, geotekstil" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div class="md:col-span-3">
+            <label class="label">Kaedah Buang Tanah</label>
+            <input id="disposal" type="text" placeholder="cth: Susun tepi longkang, bawa ke tapak buangan" class="w-full rounded-xl border-gray-300" />
+          </div>
+          <div class="md:col-span-3">
+            <label class="label">Isu / Halangan</label>
+            <textarea id="issues" rows="2" class="w-full rounded-xl border-gray-300" placeholder="cth: Akar pokok, paip sedia ada, tanah lembik"></textarea>
+          </div>
+          <div class="md:col-span-3">
+            <label class="label">Nota Keselamatan</label>
+            <textarea id="safety" rows="2" class="w-full rounded-xl border-gray-300" placeholder="cth: Letak kon amaran, laluan alternatif"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Photos -->
+      <div class="section-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Foto</h2>
+          <span class="hint">Foto akan dimampat ke 1280px max.</span>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-medium">Sebelum</h3>
+              <span class="badge" id="countBefore">0</span>
+            </div>
+            <input id="photosBefore" type="file" accept="image/*" multiple class="w-full" />
+            <div id="previewBefore" class="grid-photos mt-3"></div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-medium">Semasa</h3>
+              <span class="badge" id="countDuring">0</span>
+            </div>
+            <input id="photosDuring" type="file" accept="image/*" multiple class="w-full" />
+            <div id="previewDuring" class="grid-photos mt-3"></div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-medium">Selepas</h3>
+              <span class="badge" id="countAfter">0</span>
+            </div>
+            <input id="photosAfter" type="file" accept="image/*" multiple class="w-full" />
+            <div id="previewAfter" class="grid-photos mt-3"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Signature -->
+      <div class="section-card p-5">
+        <h2 class="text-lg font-semibold mb-2">Tandatangan Pekerja</h2>
+        <p class="hint mb-2">Tandatangan di bawah (guna jari/stylus).</p>
+        <canvas id="sig" class="sig"></canvas>
+        <div class="flex gap-2 mt-2">
+          <button id="btnClearSig" class="btn btn-ghost">Padam</button>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap gap-2">
+        <button id="btnSaveDraft" class="btn btn-ghost">Simpan Draf</button>
+        <button id="btnReset" class="btn btn-danger">Reset</button>
+        <button id="btnToReview" class="btn btn-primary">Semak & Eksport</button>
+      </div>
+      <p id="msg" class="text-sm text-gray-500"></p>
+    </section>
+
+    <!-- REVIEW -->
+    <section id="reviewSection" class="hidden">
+      <div id="reviewArea" class="section-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold">Laporan Kerja Longkang</h2>
+            <p class="text-xs text-gray-500">Rompin • 500 Ekar</p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm">Tarikh: <span id="r_date">-</span></div>
+            <div class="text-sm">GPS: <span id="r_gps">-</span></div>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="section-card p-4">
+            <h3 class="font-medium mb-2">Krew</h3>
+            <div class="text-sm">Pekerja: <span id="r_workerName">-</span></div>
+            <div class="text-sm">Penyelia: <span id="r_supervisor">-</span></div>
+            <div class="text-sm">Pasukan/Syif: <span id="r_team">-</span></div>
+            <div class="text-sm">Masa: <span id="r_time">-</span></div>
+          </div>
+          <div class="section-card p-4 md:col-span-2">
+            <h3 class="font-medium mb-2">Lokasi</h3>
+            <div class="text-sm">Seksyen: <span id="r_location">-</span></div>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4 mt-4">
+          <div class="section-card p-4">
+            <h3 class="font-medium mb-2">Dimensi</h3>
+            <div class="text-sm">Panjang: <span id="r_len">-</span> m</div>
+            <div class="text-sm">Lebar: <span id="r_wid">-</span> m</div>
+            <div class="text-sm">Dalam: <span id="r_dep">-</span> m</div>
+          </div>
+          <div class="section-card p-4">
+            <h3 class="font-medium mb-2">Keadaan</h3>
+            <div class="text-sm">Tanah: <span id="r_soil">-</span></div>
+            <div class="text-sm">Cuaca: <span id="r_weather">-</span></div>
+            <div class="text-sm">Aliran Air: <span id="r_flow">-</span></div>
+          </div>
+          <div class="section-card p-4">
+            <h3 class="font-medium mb-2">Sumber</h3>
+            <div class="text-sm">Peralatan: <span id="r_tools">-</span></div>
+            <div class="text-sm">Bahan/Tambah: <span id="r_materials">-</span></div>
+            <div class="text-sm">Buang Tanah: <span id="r_disposal">-</span></div>
+          </div>
+        </div>
+
+        <div class="section-card p-4 mt-4">
+          <h3 class="font-medium mb-2">Isu & Keselamatan</h3>
+          <div class="text-sm">Isu/Halangan: <span id="r_issues">-</span></div>
+          <div class="text-sm">Keselamatan: <span id="r_safety">-</span></div>
+        </div>
+
+        <div class="mt-6">
+          <h3 class="font-medium mb-2">Foto</h3>
+          <div class="mb-3 text-xs text-gray-500">Disusun mengikut kategori: Sebelum → Semasa → Selepas</div>
+          <div class="grid md:grid-cols-3 gap-4">
+            <div>
+              <div class="font-medium mb-2">Sebelum</div>
+              <div id="r_before" class="grid-photos"></div>
+            </div>
+            <div>
+              <div class="font-medium mb-2">Semasa</div>
+              <div id="r_during" class="grid-photos"></div>
+            </div>
+            <div>
+              <div class="font-medium mb-2">Selepas</div>
+              <div id="r_after" class="grid-photos"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <h3 class="font-medium mb-2">Tandatangan</h3>
+          <img id="r_sig" class="border border-gray-200 rounded-lg max-h-40" alt="Signature"/>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 mt-4">
+        <button id="btnBackToForm" class="btn btn-ghost">Edit Semula</button>
+        <button id="btnPDF" class="btn btn-primary">Simpan PDF</button>
+        <button id="btnShareWA" class="btn btn-ghost">Kongsi WhatsApp</button>
+      </div>
+      <p id="msgReview" class="text-sm text-gray-500 mt-2"></p>
+    </section>
+  </main>
+
+  <script>
+    // ------------ State & Helpers ------------
+    const KEY = 'rompin-longkang-v1';
+    let state = {
+      date: '', startTime:'', endTime:'',
+      workerName:'', supervisor:'', team:'',
+      location:'', gps:'',
+      len:'', wid:'', dep:'',
+      soil:'', weather:'', flow:'',
+      tools:'', materials:'', disposal:'',
+      issues:'', safety:'',
+      photos: { before:[], during:[], after:[] }, // [{dataURL, caption}]
+      signature: ''
+    };
+
+    const els = id => document.getElementById(id);
+
+    function saveLocal() {
+      try{
+        localStorage.setItem(KEY, JSON.stringify(state));
+        setMsg('Draf disimpan.');
+      }catch(e){
+        setMsg('Storan penuh. Kurangkan foto atau isi.');
+      }
+    }
+    function loadLocal() {
+      const raw = localStorage.getItem(KEY);
+      if(!raw) return;
+      try{
+        state = JSON.parse(raw);
+        fillForm();
+      }catch{}
+    }
+    function clearAll() {
+      localStorage.removeItem(KEY);
+      state = {
+        date: '', startTime:'', endTime:'',
+        workerName:'', supervisor:'', team:'',
+        location:'', gps:'',
+        len:'', wid:'', dep:'',
+        soil:'', weather:'', flow:'',
+        tools:'', materials:'', disposal:'',
+        issues:'', safety:'',
+        photos: { before:[], during:[], after:[] },
+        signature: ''
+      };
+      fillForm();
+      refreshPreviews();
+      setMsg('Form direset.');
+    }
+    function setMsg(t){ els('msg').textContent = t; setTimeout(()=>els('msg').textContent='',2500); }
+    function setMsgReview(t){ els('msgReview').textContent = t; setTimeout(()=>els('msgReview').textContent='',3000); }
+
+    // Resize image to max 1280
+    function fileToDataURLCompressed(file, maxDim=1280){
+      return new Promise((resolve,reject)=>{
+        const reader = new FileReader();
+        reader.onload = e=>{
+          const img = new Image();
+          img.onload = ()=>{
+            const c = document.createElement('canvas');
+            let {width, height} = img;
+            const ratio = width/height;
+            if(width>height && width>maxDim){ width = maxDim; height = Math.round(maxDim/ratio); }
+            else if(height>=width && height>maxDim){ height = maxDim; width = Math.round(maxDim*ratio); }
+            c.width = width; c.height = height;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img,0,0,width,height);
+            // quality 0.85
+            const out = c.toDataURL('image/jpeg', 0.85);
+            resolve(out);
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function bytesOfState(){
+      try{
+        return new Blob([JSON.stringify(state)]).size;
+      }catch{ return 0;}
+    }
+    function niceBytes(b){
+      if(b<1024) return b+' B';
+      if(b<1024*1024) return (b/1024).toFixed(1)+' KB';
+      return (b/1024/1024).toFixed(2)+' MB';
+    }
+
+    // ------------ Form Wiring ------------
+    const bindInputs = [
+      'date','startTime','endTime','workerName','supervisor','team',
+      'location','gps','len','wid','dep','soil','weather','flow',
+      'tools','materials','disposal','issues','safety'
+    ];
+    function fillForm(){
+      bindInputs.forEach(id=>{ els(id).value = state[id] || ''; });
+      // signature
+      if(state.signature){
+        const img = new Image();
+        img.onload = ()=>{
+          sigCtx.clearRect(0,0,sig.width,sig.height);
+          sigCtx.drawImage(img,0,0,sig.width,sig.height);
+        };
+        img.src = state.signature;
+      }else{
+        sigCtx.clearRect(0,0,sig.width,sig.height);
+      }
+      refreshPreviews();
+    }
+    function readFormIntoState(){
+      bindInputs.forEach(id=>{ state[id] = els(id).value.trim(); });
+    }
+
+    // GPS
+    els('btnGPS').addEventListener('click', ()=>{
+      if(!navigator.geolocation){ setMsg('Geolokasi tidak disokong.'); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos=>{
+          const {latitude, longitude} = pos.coords;
+          const txt = latitude.toFixed(6)+', '+longitude.toFixed(6);
+          els('gps').value = txt;
+          state.gps = txt;
+          saveLocal();
+        },
+        err=> setMsg('Gagal ambil GPS: ' + err.message),
+        { enableHighAccuracy:true, timeout:10000 }
+      );
+    });
+
+    // Photo handlers
+    function handleFiles(inputEl, bucket){
+      const files = Array.from(inputEl.files || []);
+      if(!files.length) return;
+      const promises = files.map(f=>fileToDataURLCompressed(f));
+      Promise.all(promises).then(list=>{
+        list.forEach(dataURL=>{
+          state.photos[bucket].push({dataURL, caption:''});
+        });
+        refreshPreviews();
+        saveLocal();
+      }).catch(()=> setMsg('Gagal proses foto.'));
+      // Clear input
+      inputEl.value = '';
+    }
+
+    function refreshPreviews(){
+      const mappings = [
+        ['before','previewBefore','countBefore'],
+        ['during','previewDuring','countDuring'],
+        ['after','previewAfter','countAfter']
+      ];
+      mappings.forEach(([bucket, previewId, countId])=>{
+        const wrap = els(previewId);
+        wrap.innerHTML = '';
+        state.photos[bucket].forEach((p, idx)=>{
+          const card = document.createElement('div');
+          card.className = 'photo-card';
+          card.innerHTML = `
+            <img src="${p.dataURL}" alt="${bucket}-${idx}">
+            <div class="photo-cap">
+              <input data-bucket="${bucket}" data-idx="${idx}" type="text" class="w-full rounded-lg border-gray-300 text-xs p-1"
+                placeholder="Kapsyen..." value="${p.caption||''}">
+              <div class="flex justify-between mt-2">
+                <span class="hint">${bucket}</span>
+                <button data-del="${bucket}:${idx}" class="text-red-600 text-xs">Buang</button>
+              </div>
+            </div>`;
+          wrap.appendChild(card);
+        });
+        els(countId).textContent = String(state.photos[bucket].length);
+      });
+      // wire caption & delete
+      document.querySelectorAll('.photo-cap input[type="text"]').forEach(inp=>{
+        inp.addEventListener('input', (e)=>{
+          const b = e.target.dataset.bucket, i = +e.target.dataset.idx;
+          state.photos[b][i].caption = e.target.value;
+          saveLocal();
+        });
+      });
+      document.querySelectorAll('[data-del]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const [b,i] = btn.dataset.del.split(':');
+          state.photos[b].splice(+i,1);
+          refreshPreviews();
+          saveLocal();
+        });
+      });
+
+      // size hint
+      const size = niceBytes(bytesOfState());
+      els('msg').textContent = `Saiz draf: ${size}`;
+      setTimeout(()=>{ if(els('msg').textContent.startsWith('Saiz')) els('msg').textContent=''; }, 2500);
+    }
+
+    els('photosBefore').addEventListener('change', e=>handleFiles(e.target,'before'));
+    els('photosDuring').addEventListener('change', e=>handleFiles(e.target,'during'));
+    els('photosAfter').addEventListener('change', e=>handleFiles(e.target,'after'));
+
+    // Signature pad (basic)
+    const sig = els('sig');
+    const sigCtx = sig.getContext('2d');
+    function resizeSig(){ sig.width = sig.clientWidth; sig.height = sig.clientHeight; }
+    window.addEventListener('resize', ()=>{
+      const old = state.signature;
+      resizeSig();
+      if(old){
+        const img = new Image();
+        img.onload = ()=> sigCtx.drawImage(img,0,0,sig.width,sig.height);
+        img.src = old;
+      }
+    });
+    resizeSig();
+
+    let drawing = false;
+    let last = null;
+    function pos(evt){
+      const r = sig.getBoundingClientRect();
+      if(evt.touches && evt.touches[0]){
+        return { x: evt.touches[0].clientX - r.left, y: evt.touches[0].clientY - r.top };
+      }
+      return { x: evt.clientX - r.left, y: evt.clientY - r.top };
+    }
+    function drawTo(p){
+      if(!last) last = p;
+      sigCtx.lineCap = 'round';
+      sigCtx.strokeStyle = '#111827';
+      sigCtx.lineWidth = 2;
+      sigCtx.beginPath();
+      sigCtx.moveTo(last.x, last.y);
+      sigCtx.lineTo(p.x, p.y);
+      sigCtx.stroke();
+      last = p;
+    }
+    const start = e=>{ drawing = true; last = null; drawTo(pos(e)); e.preventDefault(); };
+    const move = e=>{ if(!drawing) return; drawTo(pos(e)); e.preventDefault(); };
+    const end  = ()=>{ drawing = false; state.signature = sig.toDataURL('image/png'); saveLocal(); };
+
+    sig.addEventListener('mousedown', start);
+    sig.addEventListener('mousemove', move);
+    sig.addEventListener('mouseup', end);
+    sig.addEventListener('mouseleave', end);
+    sig.addEventListener('touchstart', start, {passive:false});
+    sig.addEventListener('touchmove', move, {passive:false});
+    sig.addEventListener('touchend', end);
+
+    els('btnClearSig').addEventListener('click', ()=>{
+      sigCtx.clearRect(0,0,sig.width,sig.height);
+      state.signature = '';
+      saveLocal();
+    });
+
+    // Bind inputs to state
+    bindInputs.forEach(id=>{
+      els(id).addEventListener('input', ()=>{
+        state[id] = els(id).value.trim();
+        saveLocal();
+      });
+    });
+
+    // Buttons
+    els('btnSaveDraft').addEventListener('click', ()=>{ readFormIntoState(); saveLocal(); });
+    els('btnReset').addEventListener('click', ()=>{ if(confirm('Padam semua isi?')) clearAll(); });
+
+    // Tabs
+    function showForm(){ els('formSection').classList.remove('hidden'); els('reviewSection').classList.add('hidden'); }
+    function showReview(){ els('formSection').classList.add('hidden'); els('reviewSection').classList.remove('hidden'); }
+    els('btnFormTab').addEventListener('click', showForm);
+    els('btnReviewTab').addEventListener('click', ()=>{ buildReview(); showReview(); });
+
+    els('btnToReview').addEventListener('click', ()=>{ readFormIntoState(); buildReview(); showReview(); });
+
+    els('btnBackToForm').addEventListener('click', showForm);
+
+    // ------------ Review Builder ------------
+    function buildReview(){
+      // Push values
+      els('r_date').textContent = state.date || '-';
+      els('r_gps').textContent = state.gps || '-';
+      els('r_workerName').textContent = state.workerName || '-';
+      els('r_supervisor').textContent = state.supervisor || '-';
+      els('r_team').textContent = state.team || '-';
+      els('r_time').textContent = `${state.startTime||'-'} → ${state.endTime||'-'}`;
+      els('r_location').textContent = state.location || '-';
+      els('r_len').textContent = state.len || '-';
+      els('r_wid').textContent = state.wid || '-';
+      els('r_dep').textContent = state.dep || '-';
+      els('r_soil').textContent = state.soil || '-';
+      els('r_weather').textContent = state.weather || '-';
+      els('r_flow').textContent = state.flow || '-';
+      els('r_tools').textContent = state.tools || '-';
+      els('r_materials').textContent = state.materials || '-';
+      els('r_disposal').textContent = state.disposal || '-';
+      els('r_issues').textContent = state.issues || '-';
+      els('r_safety').textContent = state.safety || '-';
+      els('r_sig').src = state.signature || '';
+
+      const buckets = [
+        ['before','r_before'],
+        ['during','r_during'],
+        ['after','r_after']
+      ];
+      buckets.forEach(([b,containerId])=>{
+        const wrap = els(containerId);
+        wrap.innerHTML = '';
+        state.photos[b].forEach((p, idx)=>{
+          const card = document.createElement('div');
+          card.className = 'photo-card';
+          card.innerHTML = `<img src="${p.dataURL}" alt="${b}-${idx}"><div class="photo-cap">${p.caption||''}</div>`;
+          wrap.appendChild(card);
+        });
+      });
+    }
+
+    // ------------ PDF Export ------------
+    async function exportPDF(){
+      setMsgReview('Menjana PDF…');
+      // Create PDF using jsPDF; also embed photos on subsequent pages in a grid
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit:'pt', format:'a4' });
+      // First page: snapshot of review header/summary (without huge photo grids to keep resolution OK)
+      // We'll temporarily clone reviewArea without large images to avoid raster bloat.
+      const review = document.getElementById('reviewArea');
+      const clone = review.cloneNode(true);
+      // keep as-is (html2canvas will render)
+      const canvas = await html2canvas(clone, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+      const imgData = canvas.toDataURL('image/png', 0.92);
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      // Fit snapshot within margins
+      const margin = 24;
+      let w = pageW - margin*2;
+      let h = canvas.height * (w / canvas.width);
+      if(h > pageH - margin*2){ h = pageH - margin*2; w = canvas.width * (h / canvas.height); }
+      pdf.addImage(imgData, 'PNG', (pageW-w)/2, margin, w, h);
+
+      // Next: photos per bucket, 2 per row
+      const addBucket = (title, arr)=>{
+        pdf.addPage();
+        pdf.setFontSize(14); pdf.text(title, margin, margin+6);
+        let x = margin, y = margin+18, col = 0;
+        const cellW = (pageW - margin*2 - 12) / 2;
+        const cellH = cellW * 0.65;
+        pdf.setFontSize(9);
+        arr.forEach(p=>{
+          pdf.addImage(p.dataURL, 'JPEG', x, y, cellW, cellH, undefined, 'FAST');
+          if(p.caption){
+            const capY = y + cellH + 10;
+            pdf.text(p.caption.substring(0,90), x, capY);
+          }
+          col++;
+          if(col===2){ col=0; x=margin; y += cellH + 30; }
+          else{ x += cellW + 12; }
+          // new page if overflow
+          if(y + cellH + 60 > pageH - margin){
+            pdf.addPage();
+            pdf.setFontSize(14); pdf.text(title+' (samb.)', margin, margin+6);
+            pdf.setFontSize(9);
+            x = margin; y = margin+18; col=0;
+          }
+        });
+      };
+      if(state.photos.before.length) addBucket('Foto Sebelum', state.photos.before);
+      if(state.photos.during.length) addBucket('Foto Semasa', state.photos.during);
+      if(state.photos.after.length) addBucket('Foto Selepas', state.photos.after);
+
+      const filename = `Rompin-Longkang-${state.date || 'laporan'}.pdf`;
+      pdf.save(filename);
+
+      // Return blob for sharing
+      const blob = pdf.output('blob');
+      return new File([blob], filename, {type:'application/pdf'});
+    }
+
+    els('btnPDF').addEventListener('click', async ()=>{
+      try{
+        await exportPDF();
+        setMsgReview('PDF disimpan.');
+      }catch(e){
+        setMsgReview('Gagal simpan PDF.');
+      }
+    });
+
+    // ------------ WhatsApp Share ------------
+    els('btnShareWA').addEventListener('click', async ()=>{
+      readFormIntoState();
+      // Try to make a PDF file to share
+      let file;
+      try{ file = await exportPDF(); }catch{}
+      const text =
+        `Laporan Kerja Longkang (Rompin, 500 ekar)\n`+
+        `Tarikh: ${state.date || '-'}\n`+
+        `Pekerja: ${state.workerName || '-'} | Penyelia: ${state.supervisor || '-'}\n`+
+        `Masa: ${state.startTime||'-'} → ${state.endTime||'-'}\n`+
+        `Lokasi: ${state.location || '-'} | GPS: ${state.gps || '-'}\n`+
+        `Dimensi: Panjang ${state.len||'-'} m, Lebar ${state.wid||'-'} m, Dalam ${state.dep||'-'} m\n`+
+        `Keadaan: Tanah=${state.soil||'-'}, Cuaca=${state.weather||'-'}, Aliran=${state.flow||'-'}\n`+
+        `Peralatan: ${state.tools||'-'}\n`+
+        `Bahan/Tambah: ${state.materials||'-'} | Buang Tanah: ${state.disposal||'-'}\n`+
+        `Isu: ${state.issues||'-'} | Keselamatan: ${state.safety||'-'}\n`;
+
+      // Prefer Web Share with PDF attachment (mobile)
+      if(navigator.share && file){
+        try{
+          await navigator.share({ text, files:[file], title:'Laporan Longkang Rompin' });
+          setMsgReview('Dikongsi melalui Share Sheet.');
+          return;
+        }catch(e){ /* fallthrough */ }
+      }
+
+      // Fallback: WhatsApp text link
+      const wa = 'https://wa.me/?text=' + encodeURIComponent(text + '\n(PDF disimpan pada peranti)');
+      window.open(wa, '_blank');
+    });
+
+    // ------------ Init ------------
+    loadLocal();
+    // Default date/time
+    if(!state.date){
+      const d = new Date();
+      els('date').valueAsDate = d;
+      state.date = els('date').value;
+      saveLocal();
+    }
+  </script>
+</body>
+</html>
