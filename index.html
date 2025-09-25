@@ -624,6 +624,21 @@
       });
     }
 
+// Load a local image file (same origin) into a DataURL for jsPDF
+async function loadDataURL(path){
+  try{
+    const res = await fetch(path, { cache: 'no-store' });
+    const blob = await res.blob();
+    return await new Promise((ok)=> {
+      const r = new FileReader();
+      r.onload = () => ok(r.result);
+      r.readAsDataURL(blob);
+    });
+  }catch(e){
+    return '';
+  }
+}
+    
     // ------------ PDF Export ------------
 // ------------ PDF Export (Branded Cover + Existing Layout) ------------
 async function exportPDF(){
@@ -639,8 +654,8 @@ async function exportPDF(){
   const BORDER = { r:226, g:232, b:240 };         // slate-200
   const margin = 28;
 
-  // OPTIONAL: base64 PNG logo (leave '' if none)
-  const LOGO_DATAURL = ''; // e.g. 'data:image/png;base64,iVBORw0K...'
+// Load your logo from /public/logo.jpeg (has white background)
+const LOGO_DATAURL = await loadDataURL('/public/logo.jpeg');
 
   // ====== DESIGN HELPERS ======
   const pageW = pdf.internal.pageSize.getWidth();
@@ -656,14 +671,17 @@ async function exportPDF(){
     brandFill(); pdf.rect(0, 0, pageW, 56, 'F');
 
     // logo or badge
-    if (LOGO_DATAURL){
-      try { pdf.addImage(LOGO_DATAURL, 'PNG', margin, 12, 120, 32, undefined, 'FAST'); } catch(e){}
-    } else {
-      pdf.setFillColor(255,255,255);
-      pdf.roundedRect(margin, 14, 36, 28, 6, 6, 'F');
-      pdf.setTextColor(BRAND.r, BRAND.g, BRAND.b);
-      pdf.setFontSize(14); pdf.text('RL', margin+10, 34); // Rompin Longkang
-    }
+if (LOGO_DATAURL){
+  // white badge behind the logo to make the edges look intentional
+  pdf.setFillColor(255,255,255);
+  pdf.roundedRect(margin, 12, 140, 36, 8, 8, 'F'); // badge
+  try { pdf.addImage(LOGO_DATAURL, 'JPEG', margin + 6, 14, 128, 32, undefined, 'FAST'); } catch(e){}
+} else {
+  pdf.setFillColor(255,255,255);
+  pdf.roundedRect(margin, 14, 36, 28, 6, 6, 'F');
+  pdf.setTextColor(BRAND.r, BRAND.g, BRAND.b);
+  pdf.setFontSize(14); pdf.text('RL', margin+10, 34); // fallback monogram
+}
 
     // title
     pdf.setTextColor(255,255,255);
@@ -766,15 +784,17 @@ async function exportPDF(){
   pdf.text('ROMPIN LONGKANG', pageW/2, pageH/2, { angle:-30, align:'center' });
   pdf.restoreGraphicsState();
 
-  // logo or badge on cover
-  if (LOGO_DATAURL){
-    try { pdf.addImage(LOGO_DATAURL, 'PNG', margin, 24, 140, 42, undefined, 'FAST'); } catch(e){}
-  } else {
-    pdf.setFillColor(255,255,255);
-    pdf.roundedRect(margin, 28, 48, 40, 8, 8, 'F');
-    pdf.setTextColor(BRAND.r, BRAND.g, BRAND.b);
-    pdf.setFontSize(18); pdf.text('RL', margin+14, 55);
-  }
+ // logo or badge on cover
+if (LOGO_DATAURL){
+  pdf.setFillColor(255,255,255);
+  pdf.roundedRect(margin, 24, 180, 56, 10, 10, 'F'); // bigger badge
+  try { pdf.addImage(LOGO_DATAURL, 'JPEG', margin + 8, 28, 164, 48, undefined, 'FAST'); } catch(e){}
+} else {
+  pdf.setFillColor(255,255,255);
+  pdf.roundedRect(margin, 28, 48, 40, 8, 8, 'F');
+  pdf.setTextColor(BRAND.r, BRAND.g, BRAND.b);
+  pdf.setFontSize(18); pdf.text('RL', margin+14, 55);
+}
 
   // Title block (centered)
   pdf.setTextColor(255,255,255);
