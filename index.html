@@ -625,7 +625,7 @@
     }
 
     // ------------ PDF Export ------------
-   // ------------ PDF Export (Branded Layout) ------------
+// ------------ PDF Export (Branded Cover + Existing Layout) ------------
 async function exportPDF(){
   setMsgReview('Menjana PDF…');
 
@@ -634,37 +634,35 @@ async function exportPDF(){
 
   // ====== BRAND SETTINGS ======
   const BRAND = { r:79, g:70, b:229 };            // indigo-600
-  const SUBTLE = { r:100, g:116, b:139 };         // slate-500 text
-  const LIGHT = { r:241, g:245, b:249 };          // slate-100 bg
-  const BORDER = { r:226, g:232, b:240 };         // slate-200 line
+  const SUBTLE = { r:100, g:116, b:139 };         // slate-500
+  const LIGHT  = { r:241, g:245, b:249 };         // slate-100
+  const BORDER = { r:226, g:232, b:240 };         // slate-200
   const margin = 28;
 
-  // OPTIONAL: add your logo here (DataURL, e.g., base64 PNG). Leave empty if none.
-  // Tip: you can capture your logo <img> into a canvas and getDataURL,
-  // or use an online base64 encoder. 120x40 transparent PNG works well.
+  // OPTIONAL: base64 PNG logo (leave '' if none)
   const LOGO_DATAURL = ''; // e.g. 'data:image/png;base64,iVBORw0K...'
 
   // ====== DESIGN HELPERS ======
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
-  const brandFill = ()=>pdf.setFillColor(BRAND.r, BRAND.g, BRAND.b);
-  const subtleText = ()=>pdf.setTextColor(SUBTLE.r, SUBTLE.g, SUBTLE.b);
-  const darkText = ()=>pdf.setTextColor(0,0,0);
-  const lightFill = ()=>pdf.setFillColor(LIGHT.r, LIGHT.g, LIGHT.b);
-  const borderStroke = ()=>pdf.setDrawColor(BORDER.r, BORDER.g, BORDER.b);
+  const brandFill   = ()=>pdf.setFillColor(BRAND.r, BRAND.g, BRAND.b);
+  const subtleText  = ()=>pdf.setTextColor(SUBTLE.r, SUBTLE.g, SUBTLE.b);
+  const darkText    = ()=>pdf.setTextColor(0,0,0);
+  const lightFill   = ()=>pdf.setFillColor(LIGHT.r, LIGHT.g, LIGHT.b);
+  const borderStroke= ()=>pdf.setDrawColor(BORDER.r, BORDER.g, BORDER.b);
 
   function header(title, subtitle){
     // brand bar
     brandFill(); pdf.rect(0, 0, pageW, 56, 'F');
 
-    // logo box or circle marker
+    // logo or badge
     if (LOGO_DATAURL){
       try { pdf.addImage(LOGO_DATAURL, 'PNG', margin, 12, 120, 32, undefined, 'FAST'); } catch(e){}
     } else {
       pdf.setFillColor(255,255,255);
       pdf.roundedRect(margin, 14, 36, 28, 6, 6, 'F');
       pdf.setTextColor(BRAND.r, BRAND.g, BRAND.b);
-      pdf.setFontSize(14); pdf.text('RL', margin+10, 34); // "Rompin Longkang" initials
+      pdf.setFontSize(14); pdf.text('RL', margin+10, 34); // Rompin Longkang
     }
 
     // title
@@ -673,37 +671,25 @@ async function exportPDF(){
     pdf.text(title, margin + 140, 26);
     pdf.setFontSize(10);
     pdf.text(subtitle, margin + 140, 42);
-
-    // subtle watermark background (diagonal text)
-    pdf.saveGraphicsState();
-    pdf.setGState(new pdf.GState({ opacity: 0.05 }));
-    pdf.setTextColor(0,0,0);
-    pdf.setFontSize(60);
-    pdf.text('ROMPIN LONGKANG', pageW/2, pageH/2, { angle: -30, align:'center' });
-    pdf.restoreGraphicsState();
   }
 
   function footer(){
     const pageNo = pdf.getNumberOfPages();
-    subtleText();
-    pdf.setFontSize(9);
-    pdf.text(`Halaman ${pageNo}`, pageW - margin, pageH - 10, { align:'right' });
+    subtleText(); pdf.setFontSize(9);
     // hairline rule
-    borderStroke();
-    pdf.setLineWidth(0.5);
+    borderStroke(); pdf.setLineWidth(0.5);
     pdf.line(margin, pageH - 24, pageW - margin, pageH - 24);
+    pdf.text(`Halaman ${pageNo}`, pageW - margin, pageH - 10, { align:'right' });
   }
 
-  function startPage(title, subtitle){
-    if (pdf.getNumberOfPages() === 0) pdf.addPage(); else pdf.addPage();
+  function newPage(title, subtitle){
+    pdf.addPage();                 // add a fresh page (NOT used for cover)
     header(title, subtitle);
     footer();
-    // return content Y start
-    return 72; // below header
+    return 72; // content Y start
   }
 
   function sectionCard(label, lines, yStart){
-    // card backdrop
     const cardX = margin, cardW = pageW - margin*2;
     const pad = 12;
     let y = yStart;
@@ -722,25 +708,22 @@ async function exportPDF(){
 
     let textY = y + 16;
     lines.forEach(txt=>{
-      // automatic wrap
       const wrapped = pdf.splitTextToSize(String(txt), cardW - pad*2);
       pdf.text(wrapped, cardX + pad, textY);
       textY += wrapped.length * 12;
     });
 
-    return y + (18 + lines.length*14 + pad) + 12; // next Y
+    return y + (18 + lines.length*14 + pad) + 12;
   }
 
   function photoGrid(title, photos){
     if (!photos || !photos.length) return;
 
-    let y = startPage(title, 'Gambar susunan grid');
+    let y = newPage(title, 'Gambar susunan grid');
     pdf.setFontSize(12); darkText();
     pdf.text(title, margin, y); y += 10;
 
-    // grid config
-    const gap = 12;
-    const cols = 2;
+    const gap = 12, cols = 2;
     const cellW = (pageW - margin*2 - gap*(cols-1));
     const singleW = Math.floor(cellW / cols);
     const imgH = Math.round(singleW * 0.66);
@@ -748,38 +731,91 @@ async function exportPDF(){
     for (let i=0; i<photos.length; i++){
       const col = i % cols;
       const rowStart = (i>0 && col===0);
-
       const x = margin + col * (singleW + gap);
-      if (rowStart) y += imgH + 36; // space for previous row caption
+      if (rowStart) y += imgH + 36;
 
-      // new page if overflow
       if (y + imgH + 60 > pageH - margin){
-        y = startPage(title + ' (samb.)', 'Sambungan foto');
+        y = newPage(title + ' (samb.)', 'Sambungan foto');
         pdf.setFontSize(12); darkText(); pdf.text(title + ' (samb.)', margin, y); y += 10;
       }
 
-      try {
-        pdf.addImage(photos[i].dataURL, 'JPEG', x, y, singleW, imgH, undefined, 'FAST');
-      } catch(e){ /* skip if any image issue */ }
-
-      // caption
+      try { pdf.addImage(photos[i].dataURL, 'JPEG', x, y, singleW, imgH, undefined, 'FAST'); } catch(e){}
       subtleText(); pdf.setFontSize(9);
       const cap = (photos[i].caption || '').toString().substring(0, 140);
       pdf.text(pdf.splitTextToSize(cap, singleW), x, y + imgH + 12);
     }
   }
 
-  // ====== PAGE 1: SUMMARY ======
-  let y = startPage('Laporan Kerja Longkang', 'Rompin • 500 ekar • Local only');
+  // =====================================================
+  // =============  COVER / TITLE PAGE (Page 1) ==========
+  // =====================================================
+  // IMPORTANT: DO NOT call addPage() here; jsPDF already created page 1.
+  // Draw a designed title page on the existing first page.
+  // Background bands
+  pdf.setFillColor(248, 250, 252); // slate-50
+  pdf.rect(0, 0, pageW, pageH, 'F');
 
-  // QUICK INFO row (mini chips)
+  // top brand wedge
+  brandFill(); pdf.rect(0, 0, pageW, 90, 'F');
+
+  // watermark diagonal
+  pdf.saveGraphicsState();
+  pdf.setGState(new pdf.GState({ opacity: 0.06 }));
+  pdf.setTextColor(0,0,0);
+  pdf.setFontSize(64);
+  pdf.text('ROMPIN LONGKANG', pageW/2, pageH/2, { angle:-30, align:'center' });
+  pdf.restoreGraphicsState();
+
+  // logo or badge on cover
+  if (LOGO_DATAURL){
+    try { pdf.addImage(LOGO_DATAURL, 'PNG', margin, 24, 140, 42, undefined, 'FAST'); } catch(e){}
+  } else {
+    pdf.setFillColor(255,255,255);
+    pdf.roundedRect(margin, 28, 48, 40, 8, 8, 'F');
+    pdf.setTextColor(BRAND.r, BRAND.g, BRAND.b);
+    pdf.setFontSize(18); pdf.text('RL', margin+14, 55);
+  }
+
+  // Title block (centered)
+  pdf.setTextColor(255,255,255);
+  pdf.setFontSize(14);
+  pdf.text('Laporan Kerja', pageW - margin, 48, { align:'right' });
+
+  // Main title in center
+  darkText();
+  pdf.setFontSize(28);
+  pdf.text('KERJA KERJA TANAH', pageW/2, pageH*0.36, { align:'center' });
+  pdf.setFontSize(20);
+  pdf.text('LOT PT 12404', pageW/2, pageH*0.36 + 32, { align:'center' });
+  pdf.setFontSize(16);
+  pdf.setTextColor(71,85,105); // slate-600
+  pdf.text('ROMPIN', pageW/2, pageH*0.36 + 56, { align:'center' });
+
+  // Decorative framed box
+  borderStroke(); pdf.setLineWidth(1.2);
+  pdf.roundedRect(margin, pageH*0.36 - 32, pageW - margin*2, 120, 12, 12, 'S');
+
+  // meta (date/time)
+  subtleText(); pdf.setFontSize(10);
+  const dt = new Date();
+  const meta = `Dijana: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString()}`;
+  pdf.text(meta, margin, pageH - 24);
+
+  // =====================================================
+  // =============  PAGE 2+: SUMMARY & PHOTOS ============
+  // =====================================================
+  // Create next page with your existing styled header/footer
+  header('Laporan Kerja Longkang', 'Rompin • 500 ekar • Local only');
+  footer();
+  let y = 72; // content start below header
+
+  // QUICK INFO chips
   const chips = [
     `Tarikh: ${state.date||'-'}`,
     `Masa: ${state.startTime||'-'} → ${state.endTime||'-'}`,
     `GPS: ${state.gps||'-'}`
   ];
-  pdf.setFontSize(9);
-  subtleText();
+  pdf.setFontSize(9); subtleText();
   let cx = margin;
   chips.forEach(txt=>{
     const w = pdf.getTextWidth(txt) + 14;
@@ -789,43 +825,39 @@ async function exportPDF(){
   });
   y += 26;
 
-  // Crew
+  // Sections (same layout as before)
   y = sectionCard('Maklumat Krew', [
     `Pekerja: ${state.workerName || '-'}`,
     `Penyelia: ${state.supervisor || '-'}`,
     `Pasukan/Syif: ${state.team || '-'}`
   ], y);
 
-  // Location
   y = sectionCard('Lokasi', [
-    `Seksyen/Lokasi: ${state.location || '-'}`,
+    `Seksyen/Lokasi: ${state.location || '-'}`
   ], y);
 
-  // Dimensions & Conditions (two columns simulated with separate cards if space permits)
   y = sectionCard('Dimensi & Keadaan', [
     `Dimensi: Panjang ${state.len||'-'} m, Lebar ${state.wid||'-'} m, Dalam ${state.dep||'-'} m`,
     `Keadaan: Tanah=${state.soil||'-'}, Cuaca=${state.weather||'-'}, Aliran=${state.flow||'-'}`
   ], y);
 
-  // Resources
   y = sectionCard('Sumber & Kaedah', [
     `Peralatan: ${state.tools || '-'}`,
     `Bahan/Tambah: ${state.materials || '-'}`,
     `Kaedah Buang Tanah: ${state.disposal || '-'}`
   ], y);
 
-  // Issues & Safety
   y = sectionCard('Isu & Keselamatan', [
     `Isu/Halangan: ${state.issues || '-'}`,
     `Nota Keselamatan: ${state.safety || '-'}`
   ], y);
 
-  // Signature (inside framed box)
+  // Signature
   if (state.signature){
     const sigW = pageW - margin*2;
     const sigH = 80;
     if (y + sigH + 40 > pageH - margin){
-      y = startPage('Tandatangan', 'Pengesahan pekerja');
+      y = newPage('Tandatangan', 'Pengesahan pekerja');
     }
     borderStroke();
     pdf.roundedRect(margin, y, sigW, sigH, 8, 8, 'S');
@@ -834,12 +866,12 @@ async function exportPDF(){
     pdf.text('Tandatangan Pekerja', margin, y + sigH + 12);
   }
 
-  // ====== PHOTO PAGES ======
+  // Photo pages (unchanged in behavior)
   if (state.photos.before?.length) photoGrid('Foto Sebelum', state.photos.before);
   if (state.photos.during?.length) photoGrid('Foto Semasa',  state.photos.during);
   if (state.photos.after?.length)  photoGrid('Foto Selepas', state.photos.after);
 
-  // ====== SAVE & RETURN FILE ======
+  // Save & return file
   const filename = `Rompin-Longkang-${state.date || 'laporan'}.pdf`;
   pdf.save(filename);
   const blob = pdf.output('blob');
