@@ -643,6 +643,15 @@ async function loadDataURL(relPath){
     return { dataURL:'', mime:'' };
   }
 }
+
+// Get intrinsic pixel size of a DataURL image
+async function measureDataURL(dataURL){
+  return new Promise((resolve)=> {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height });
+    img.src = dataURL;
+  });
+}
     
     // ------------ PDF Export ------------
 // ------------ PDF Export (Branded Cover + Existing Layout) ------------
@@ -662,6 +671,8 @@ async function exportPDF(){
 // Load your logo from /public/logo.jpeg (has white background)
 const { dataURL: LOGO_DATAURL, mime: LOGO_MIME } = await loadDataURL('public/logo.jpeg');
 const LOGO_FMT = (LOGO_DATAURL.startsWith('data:image/png') || LOGO_MIME.includes('png')) ? 'PNG' : 'JPEG';
+// Measure original logo size (to keep aspect ratio)
+const LOGO_SIZE = LOGO_DATAURL ? await measureDataURL(LOGO_DATAURL) : { w:0, h:0 };  
 
   // ====== DESIGN HELPERS ======
   const pageW = pdf.internal.pageSize.getWidth();
@@ -676,11 +687,24 @@ const LOGO_FMT = (LOGO_DATAURL.startsWith('data:image/png') || LOGO_MIME.include
     // brand bar
     brandFill(); pdf.rect(0, 0, pageW, 56, 'F');
 
-   // logo or badge
+ // logo or badge
 if (LOGO_DATAURL){
+  // badge background
   pdf.setFillColor(255,255,255);
-  pdf.roundedRect(margin, 12, 140, 36, 8, 8, 'F'); // white badge
-  try { pdf.addImage(LOGO_DATAURL, LOGO_FMT, margin + 6, 14, 128, 32, undefined, 'FAST'); } catch(e){}
+  const badgeX = margin, badgeY = 12, badgeW = 140, badgeH = 36;
+  pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 8, 8, 'F');
+
+  // fit logo inside badge without distortion (object-fit: contain)
+  try {
+    const maxW = badgeW - 12;  // inner padding
+    const maxH = badgeH - 8;
+    const scale = Math.min(maxW / LOGO_SIZE.w, maxH / LOGO_SIZE.h);
+    const drawW = LOGO_SIZE.w * scale;
+    const drawH = LOGO_SIZE.h * scale;
+    const x = badgeX + (badgeW - drawW) / 2;
+    const y = badgeY + (badgeH - drawH) / 2;
+    pdf.addImage(LOGO_DATAURL, LOGO_FMT, x, y, drawW, drawH, undefined, 'FAST');
+  } catch(e){}
 } else {
   pdf.setFillColor(255,255,255);
   pdf.roundedRect(margin, 14, 36, 28, 6, 6, 'F');
@@ -792,8 +816,19 @@ if (LOGO_DATAURL){
  // logo or badge on cover
 if (LOGO_DATAURL){
   pdf.setFillColor(255,255,255);
-  pdf.roundedRect(margin, 24, 180, 56, 10, 10, 'F');
-  try { pdf.addImage(LOGO_DATAURL, LOGO_FMT, margin + 8, 28, 164, 48, undefined, 'FAST'); } catch(e){}
+  const badgeX = margin, badgeY = 24, badgeW = 180, badgeH = 56;
+  pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 10, 10, 'F');
+
+  try {
+    const maxW = badgeW - 16;
+    const maxH = badgeH - 12;
+    const scale = Math.min(maxW / LOGO_SIZE.w, maxH / LOGO_SIZE.h);
+    const drawW = LOGO_SIZE.w * scale;
+    const drawH = LOGO_SIZE.h * scale;
+    const x = badgeX + (badgeW - drawW) / 2;
+    const y = badgeY + (badgeH - drawH) / 2;
+    pdf.addImage(LOGO_DATAURL, LOGO_FMT, x, y, drawW, drawH, undefined, 'FAST');
+  } catch(e){}
 } else {
   pdf.setFillColor(255,255,255);
   pdf.roundedRect(margin, 28, 48, 40, 8, 8, 'F');
