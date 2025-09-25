@@ -625,64 +625,123 @@
     }
 
     // ------------ PDF Export ------------
-    async function exportPDF(){
-      setMsgReview('Menjana PDF…');
-      // Create PDF using jsPDF; also embed photos on subsequent pages in a grid
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ unit:'pt', format:'a4' });
-      // First page: snapshot of review header/summary (without huge photo grids to keep resolution OK)
-      // We'll temporarily clone reviewArea without large images to avoid raster bloat.
-      const review = document.getElementById('reviewArea');
-      const clone = review.cloneNode(true);
-      // keep as-is (html2canvas will render)
-      const canvas = await html2canvas(clone, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
-      const imgData = canvas.toDataURL('image/png', 0.92);
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      // Fit snapshot within margins
-      const margin = 24;
-      let w = pageW - margin*2;
-      let h = canvas.height * (w / canvas.width);
-      if(h > pageH - margin*2){ h = pageH - margin*2; w = canvas.width * (h / canvas.height); }
-      pdf.addImage(imgData, 'PNG', (pageW-w)/2, margin, w, h);
+   // ------------ PDF Export ------------
+async function exportPDF(){
+  setMsgReview('Menjana PDF…');
 
-      // Next: photos per bucket, 2 per row
-      const addBucket = (title, arr)=>{
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit:'pt', format:'a4' });
+
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 28;
+  const line = (y=0)=>{ pdf.setDrawColor(230); pdf.line(margin, y, pageW - margin, y); };
+
+  // ---------- PAGE 1: Text summary (no raster screenshot) ----------
+  pdf.setFontSize(16);
+  pdf.text('Laporan Kerja Longkang — Rompin (500 ekar)', margin, margin + 4);
+
+  pdf.setFontSize(10);
+  pdf.setTextColor(100);
+
+  let y = margin + 24;
+
+  pdf.text(`Tarikh: ${state.date || '-'}`, margin, y);                    y += 14;
+  pdf.text(`Masa: ${state.startTime||'-'} → ${state.endTime||'-'}`, margin, y); y += 14;
+  pdf.text(`Pekerja: ${state.workerName || '-'}`, margin, y);            y += 14;
+  pdf.text(`Penyelia: ${state.supervisor || '-'}`, margin, y);           y += 14;
+  pdf.text(`Pasukan/Syif: ${state.team || '-'}`, margin, y);             y += 20;
+  line(y);                                                               y += 14;
+
+  pdf.text(`Lokasi/Seksyen: ${state.location || '-'}`, margin, y);
+  pdf.text(`GPS: ${state.gps || '-'}`, pageW/2, y);                      y += 20;
+  line(y);                                                               y += 14;
+
+  pdf.text(`Dimensi: Panjang ${state.len||'-'} m, Lebar ${state.wid||'-'} m, Dalam ${state.dep||'-'} m`, margin, y); y += 14;
+  pdf.text(`Keadaan: Tanah=${state.soil||'-'}, Cuaca=${state.weather||'-'}, Aliran=${state.flow||'-'}`, margin, y);  y += 20;
+  line(y);                                                                                                          y += 14;
+
+  pdf.text(`Peralatan: ${state.tools || '-'}`, margin, y);                y += 14;
+  pdf.text(`Bahan/Tambah: ${state.materials || '-'}`, margin, y);         y += 14;
+  pdf.text(`Buang Tanah: ${state.disposal || '-'}`, margin, y);           y += 20;
+  line(y);                                                               y += 14;
+
+  const wrapText = (txt, maxWidth) => pdf.splitTextToSize(String(txt || '-'), maxWidth);
+
+  pdf.text('Isu/Halangan:', margin, y);                                   y += 14;
+  let lines = wrapText(state.issues, pageW - margin*2);                   pdf.text(lines, margin, y); y += 14 + lines.length*12;
+
+  pdf.text('Keselamatan:', margin, y);                                    y += 14;
+  lines = wrapText(state.safety, pageW - margin*2);                       pdf.text(lines, margin, y); y += 14 + lines.length*12;
+
+  // signature (if any)
+  if (state.signature) {
+    // box
+    const sigW = (pageW - margin*2);
+    const sigH = 80;
+    if (y + sigH + 40 > pageH - margin) { pdf.addPage(); y = margin; }
+    pdf.setDrawColor(200);
+    pdf.rect(margin, y, sigW, sigH);
+    try { pdf.addImage(state.signature, 'PNG', margin + 6, y + 6, sigW - 12, sigH - 12, undefined, 'FAST'); } catch(e){}
+    y += sigH + 20;
+    pdf.text('Tandatangan Pekerja', margin, y);
+  }
+
+  // ---------- NEXT PAGES: Photo grids ----------
+  const addBucket = (title, arr) => {
+    if (!arr || !arr.length) return;
+    pdf.addPage();
+    pdf.setFontSize(14);
+    pdf.setTextColor(0);
+    pdf.text(title, margin, margin + 6);
+
+    let x = margin, y = margin + 18, col = 0;
+    const gap = 12;
+    const cellW = (pageW - margin*2 - gap) / 2;
+    const cellH = Math.round(cellW * 0.65);
+
+    pdf.setFontSize(9);
+    pdf.setTextColor(60);
+
+    for (const p of arr) {
+      try {
+        pdf.addImage(p.dataURL, 'JPEG', x, y, cellW, cellH, undefined, 'FAST');
+      } catch(e) {
+        // if image add fails, skip
+      }
+      if (p.caption) {
+        const cap = (p.caption || '').toString().substring(0, 120);
+        pdf.text(cap, x, y + cellH + 11, { maxWidth: cellW });
+      }
+
+      col++;
+      if (col === 2) { col = 0; x = margin; y += cellH + 30; }
+      else { x += cellW + gap; }
+
+      if (y + cellH + 60 > pageH - margin) {
         pdf.addPage();
-        pdf.setFontSize(14); pdf.text(title, margin, margin+6);
-        let x = margin, y = margin+18, col = 0;
-        const cellW = (pageW - margin*2 - 12) / 2;
-        const cellH = cellW * 0.65;
+        pdf.setFontSize(14);
+        pdf.setTextColor(0);
+        pdf.text(title + ' (samb.)', margin, margin + 6);
         pdf.setFontSize(9);
-        arr.forEach(p=>{
-          pdf.addImage(p.dataURL, 'JPEG', x, y, cellW, cellH, undefined, 'FAST');
-          if(p.caption){
-            const capY = y + cellH + 10;
-            pdf.text(p.caption.substring(0,90), x, capY);
-          }
-          col++;
-          if(col===2){ col=0; x=margin; y += cellH + 30; }
-          else{ x += cellW + 12; }
-          // new page if overflow
-          if(y + cellH + 60 > pageH - margin){
-            pdf.addPage();
-            pdf.setFontSize(14); pdf.text(title+' (samb.)', margin, margin+6);
-            pdf.setFontSize(9);
-            x = margin; y = margin+18; col=0;
-          }
-        });
-      };
-      if(state.photos.before.length) addBucket('Foto Sebelum', state.photos.before);
-      if(state.photos.during.length) addBucket('Foto Semasa', state.photos.during);
-      if(state.photos.after.length) addBucket('Foto Selepas', state.photos.after);
-
-      const filename = `Rompin-Longkang-${state.date || 'laporan'}.pdf`;
-      pdf.save(filename);
-
-      // Return blob for sharing
-      const blob = pdf.output('blob');
-      return new File([blob], filename, {type:'application/pdf'});
+        pdf.setTextColor(60);
+        x = margin; y = margin + 18; col = 0;
+      }
     }
+  };
+
+  addBucket('Foto Sebelum', state.photos.before);
+  addBucket('Foto Semasa',  state.photos.during);
+  addBucket('Foto Selepas', state.photos.after);
+
+  const filename = `Rompin-Longkang-${state.date || 'laporan'}.pdf`;
+
+  // Save + return a File for sharing
+  pdf.save(filename);                          // triggers download (where supported)
+  const blob = pdf.output('blob');             // also create a blob for Web Share (WA share)
+  return new File([blob], filename, { type:'application/pdf' });
+}
+
 
     els('btnPDF').addEventListener('click', async ()=>{
       try{
