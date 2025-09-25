@@ -624,18 +624,23 @@
       });
     }
 
-// Load a local image file (same origin) into a DataURL for jsPDF
-async function loadDataURL(path){
+// Load an image (relative to the page) and return {dataURL, mime}
+async function loadDataURL(relPath){
   try{
-    const res = await fetch(path, { cache: 'no-store' });
+    // Use a RELATIVE path so it works on GitHub Pages project URLs too
+    const url = new URL(relPath, window.location.href).href;
+    const res = await fetch(url, { cache: 'no-store' });
+    if(!res.ok) return { dataURL:'', mime:'' };
     const blob = await res.blob();
-    return await new Promise((ok)=> {
+    const mime = blob.type || '';
+    const dataURL = await new Promise((ok) => {
       const r = new FileReader();
       r.onload = () => ok(r.result);
       r.readAsDataURL(blob);
     });
+    return { dataURL, mime };
   }catch(e){
-    return '';
+    return { dataURL:'', mime:'' };
   }
 }
     
@@ -655,7 +660,8 @@ async function exportPDF(){
   const margin = 28;
 
 // Load your logo from /public/logo.jpeg (has white background)
-const LOGO_DATAURL = await loadDataURL('/public/logo.jpeg');
+const { dataURL: LOGO_DATAURL, mime: LOGO_MIME } = await loadDataURL('public/logo.jpeg');
+const LOGO_FMT = (LOGO_DATAURL.startsWith('data:image/png') || LOGO_MIME.includes('png')) ? 'PNG' : 'JPEG';
 
   // ====== DESIGN HELPERS ======
   const pageW = pdf.internal.pageSize.getWidth();
@@ -670,17 +676,16 @@ const LOGO_DATAURL = await loadDataURL('/public/logo.jpeg');
     // brand bar
     brandFill(); pdf.rect(0, 0, pageW, 56, 'F');
 
-    // logo or badge
+   // logo or badge
 if (LOGO_DATAURL){
-  // white badge behind the logo to make the edges look intentional
   pdf.setFillColor(255,255,255);
-  pdf.roundedRect(margin, 12, 140, 36, 8, 8, 'F'); // badge
-  try { pdf.addImage(LOGO_DATAURL, 'JPEG', margin + 6, 14, 128, 32, undefined, 'FAST'); } catch(e){}
+  pdf.roundedRect(margin, 12, 140, 36, 8, 8, 'F'); // white badge
+  try { pdf.addImage(LOGO_DATAURL, LOGO_FMT, margin + 6, 14, 128, 32, undefined, 'FAST'); } catch(e){}
 } else {
   pdf.setFillColor(255,255,255);
   pdf.roundedRect(margin, 14, 36, 28, 6, 6, 'F');
   pdf.setTextColor(BRAND.r, BRAND.g, BRAND.b);
-  pdf.setFontSize(14); pdf.text('RL', margin+10, 34); // fallback monogram
+  pdf.setFontSize(14); pdf.text('RL', margin+10, 34);
 }
 
     // title
@@ -787,8 +792,8 @@ if (LOGO_DATAURL){
  // logo or badge on cover
 if (LOGO_DATAURL){
   pdf.setFillColor(255,255,255);
-  pdf.roundedRect(margin, 24, 180, 56, 10, 10, 'F'); // bigger badge
-  try { pdf.addImage(LOGO_DATAURL, 'JPEG', margin + 8, 28, 164, 48, undefined, 'FAST'); } catch(e){}
+  pdf.roundedRect(margin, 24, 180, 56, 10, 10, 'F');
+  try { pdf.addImage(LOGO_DATAURL, LOGO_FMT, margin + 8, 28, 164, 48, undefined, 'FAST'); } catch(e){}
 } else {
   pdf.setFillColor(255,255,255);
   pdf.roundedRect(margin, 28, 48, 40, 8, 8, 'F');
